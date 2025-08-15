@@ -193,11 +193,18 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
         variant="permanent"
         sx={{
           display: { xs: 'none', md: 'block' },
+          width: drawerWidth,
+          flexShrink: 0,
           '& .MuiDrawer-paper': {
-            boxSizing: 'border-box',
             width: drawerWidth,
+            boxSizing: 'border-box',
             position: 'relative',
             height: '100%',
+            overflowY: 'auto',
+            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
           },
         }}
         open

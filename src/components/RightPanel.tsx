@@ -7,12 +7,14 @@ const RightPanel: React.FC = () => {
     <Box
       sx={{
         width: 320,
+        flexShrink: 0,
         backgroundColor: 'rgba(255, 255, 255, 0.7)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderLeft: '1px solid rgba(0, 0, 0, 0.1)',
         p: 3,
         overflowY: 'auto',
+        height: '100%',
         display: { xs: 'none', lg: 'block' },
       }}
     >
