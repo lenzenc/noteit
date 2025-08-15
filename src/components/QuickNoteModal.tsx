@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -7,92 +7,71 @@ import {
   Button,
   Box,
   IconButton,
+  Typography,
   Select,
   MenuItem,
   FormControl,
-  Typography,
-  ToggleButton,
-  ToggleButtonGroup,
-  Divider,
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  Code as CodeIcon,
-  FormatBold as BoldIcon,
-  FormatItalic as ItalicIcon,
-  FormatListBulleted as ListIcon,
-  FormatListNumbered as OrderedListIcon,
-  FormatQuote as QuoteIcon,
-  Code as CodeBlockIcon,
-  Undo as UndoIcon,
-  Redo as RedoIcon,
-} from '@mui/icons-material';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { common, createLowlight } from 'lowlight';
-
-// Create lowlight instance with common languages
-const lowlight = createLowlight(common);
+import { Close as CloseIcon } from '@mui/icons-material';
+import Editor, { OnMount } from '@monaco-editor/react';
+import * as monaco from 'monaco-editor';
+import ReactMarkdown from 'react-markdown';
 
 interface QuickNoteModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (content: string, fileType: string) => void;
+  onSave: (content: string, language: string) => void;
 }
 
-const QuickNoteModal: React.FC<QuickNoteModalProps> = ({ open, onClose, onSave }) => {
-  const [fileType, setFileType] = useState('markdown');
 
-  // Initialize TipTap editor
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        codeBlock: false, // Disable default code block to use syntax highlighting
-      }),
-      CodeBlockLowlight.configure({
-        lowlight,
-      }),
-    ],
-    content: '',
-    editorProps: {
-      attributes: {
-        class: 'tiptap-editor',
-      },
-    },
-  });
+const QuickNoteModal: React.FC<QuickNoteModalProps> = ({ open, onClose, onSave }) => {
+  const [content, setContent] = useState('');
+  const [currentLanguage, setCurrentLanguage] = useState('markdown');
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<typeof monaco | null>(null);
+
+  const handleEditorDidMount: OnMount = useCallback((editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+
+    // Set initial language
+    monaco.editor.setModelLanguage(editor.getModel()!, 'markdown');
+
+    // Focus the editor
+    editor.focus();
+  }, []);
+
+  const handleLanguageChange = (newLanguage: string) => {
+    setCurrentLanguage(newLanguage);
+    if (editorRef.current && monacoRef.current) {
+      const model = editorRef.current.getModel();
+      if (model) {
+        monacoRef.current.editor.setModelLanguage(model, newLanguage);
+      }
+    }
+  };
 
   const handleSave = () => {
-    if (editor && editor.getHTML()) {
-      // Get content as markdown or HTML based on file type
-      const content = fileType === 'markdown' ? editor.storage.markdown?.getMarkdown() || editor.getText() : editor.getText();
-      onSave(content, fileType);
+    if (content.trim()) {
+      onSave(content, currentLanguage);
       handleClose();
     }
   };
 
   const handleClose = () => {
-    if (editor) {
-      editor.commands.clearContent();
+    setContent('');
+    setCurrentLanguage('markdown');
+    if (editorRef.current && monacoRef.current) {
+      const model = editorRef.current.getModel();
+      if (model) {
+        monacoRef.current.editor.setModelLanguage(model, 'markdown');
+      }
     }
-    setFileType('markdown');
     onClose();
   };
 
-  const fileExtensions = [
-    { value: 'markdown', label: 'Markdown (.md)', icon: '📝' },
-    { value: 'javascript', label: 'JavaScript (.js)', icon: '🟨' },
-    { value: 'typescript', label: 'TypeScript (.ts)', icon: '🔷' },
-    { value: 'python', label: 'Python (.py)', icon: '🐍' },
-    { value: 'json', label: 'JSON (.json)', icon: '📋' },
-    { value: 'html', label: 'HTML (.html)', icon: '🌐' },
-    { value: 'css', label: 'CSS (.css)', icon: '🎨' },
-    { value: 'text', label: 'Plain Text (.txt)', icon: '📄' },
-  ];
-
-  if (!editor) {
-    return null;
-  }
+  // Only show preview for markdown files
+  const showPreview = currentLanguage === 'markdown';
 
   return (
     <Dialog
@@ -100,17 +79,19 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({ open, onClose, onSave }
       onClose={handleClose}
       maxWidth={false}
       fullWidth
-      PaperProps={{
-        sx: {
-          width: '90vw',
-          height: '85vh',
-          maxWidth: '1400px',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: 2,
+      slotProps={{
+        paper: {
+          sx: {
+            width: '90vw',
+            height: '85vh',
+            maxWidth: '1400px',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderRadius: 2,
+          },
         },
       }}
     >
@@ -127,27 +108,22 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({ open, onClose, onSave }
           <Typography sx={{ fontSize: '1.25rem', fontWeight: 600 }}>Add Note</Typography>
           <FormControl size="small">
             <Select
-              value={fileType}
-              onChange={(e) => setFileType(e.target.value)}
+              value={currentLanguage}
+              onChange={(e) => handleLanguageChange(e.target.value)}
               sx={{
-                minWidth: 180,
+                minWidth: 120,
                 backgroundColor: 'rgba(255, 255, 255, 0.8)',
                 '& .MuiSelect-select': {
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
+                  py: 0.5,
+                  fontSize: '0.875rem',
                 },
               }}
-              startAdornment={<CodeIcon sx={{ ml: 1, mr: 0.5, fontSize: '1rem', color: '#8e8e93' }} />}
             >
-              {fileExtensions.map((ext) => (
-                <MenuItem key={ext.value} value={ext.value}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <span>{ext.icon}</span>
-                    <span>{ext.label}</span>
-                  </Box>
-                </MenuItem>
-              ))}
+              <MenuItem value="markdown">Markdown</MenuItem>
+              <MenuItem value="json">JSON</MenuItem>
+              <MenuItem value="plaintext">Plain Text</MenuItem>
+              <MenuItem value="python">Python</MenuItem>
+              <MenuItem value="javascript">JavaScript</MenuItem>
             </Select>
           </FormControl>
         </Box>
@@ -169,234 +145,76 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({ open, onClose, onSave }
         sx={{
           flex: 1,
           display: 'flex',
-          flexDirection: 'column',
           gap: 0,
           p: 0,
           overflow: 'hidden',
         }}
       >
-        {/* Editor Toolbar */}
+        {/* Monaco Editor */}
         <Box
           sx={{
+            flex: showPreview ? 1 : 'none',
+            width: showPreview ? '50%' : '100%',
             display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            p: 1,
-            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
-            backgroundColor: 'rgba(0, 0, 0, 0.02)',
+            flexDirection: 'column',
+            borderRight: showPreview ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
           }}
         >
-          <ToggleButtonGroup size="small" exclusive>
-            <ToggleButton
-              value="bold"
-              selected={editor.isActive('bold')}
-              onClick={() => editor.chain().focus().toggleBold().run()}
-              disabled={!editor.can().chain().focus().toggleBold().run()}
-            >
-              <BoldIcon fontSize="small" />
-            </ToggleButton>
-            <ToggleButton
-              value="italic"
-              selected={editor.isActive('italic')}
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-              disabled={!editor.can().chain().focus().toggleItalic().run()}
-            >
-              <ItalicIcon fontSize="small" />
-            </ToggleButton>
-          </ToggleButtonGroup>
-
-          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-
-          <ToggleButtonGroup size="small" exclusive>
-            <ToggleButton
-              value="h1"
-              selected={editor.isActive('heading', { level: 1 })}
-              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            >
-              H1
-            </ToggleButton>
-            <ToggleButton
-              value="h2"
-              selected={editor.isActive('heading', { level: 2 })}
-              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            >
-              H2
-            </ToggleButton>
-            <ToggleButton
-              value="h3"
-              selected={editor.isActive('heading', { level: 3 })}
-              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-            >
-              H3
-            </ToggleButton>
-          </ToggleButtonGroup>
-
-          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-
-          <ToggleButtonGroup size="small" exclusive>
-            <ToggleButton
-              value="bulletList"
-              selected={editor.isActive('bulletList')}
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-            >
-              <ListIcon fontSize="small" />
-            </ToggleButton>
-            <ToggleButton
-              value="orderedList"
-              selected={editor.isActive('orderedList')}
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            >
-              <OrderedListIcon fontSize="small" />
-            </ToggleButton>
-            <ToggleButton
-              value="blockquote"
-              selected={editor.isActive('blockquote')}
-              onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            >
-              <QuoteIcon fontSize="small" />
-            </ToggleButton>
-            <ToggleButton
-              value="codeBlock"
-              selected={editor.isActive('codeBlock')}
-              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            >
-              <CodeBlockIcon fontSize="small" />
-            </ToggleButton>
-          </ToggleButtonGroup>
-
-          <Box sx={{ flexGrow: 1 }} />
-
-          <ToggleButtonGroup size="small">
-            <ToggleButton
-              value="undo"
-              onClick={() => editor.chain().focus().undo().run()}
-              disabled={!editor.can().chain().focus().undo().run()}
-            >
-              <UndoIcon fontSize="small" />
-            </ToggleButton>
-            <ToggleButton
-              value="redo"
-              onClick={() => editor.chain().focus().redo().run()}
-              disabled={!editor.can().chain().focus().redo().run()}
-            >
-              <RedoIcon fontSize="small" />
-            </ToggleButton>
-          </ToggleButtonGroup>
+          <Editor
+            height="100%"
+            defaultLanguage="markdown"
+            value={content}
+            onChange={(value) => setContent(value || '')}
+            onMount={handleEditorDidMount}
+            theme="vs-light"
+            options={{
+              minimap: { enabled: true },
+              fontSize: 14,
+              lineNumbers: 'on',
+              roundedSelection: false,
+              scrollBeyondLastLine: false,
+              readOnly: false,
+              automaticLayout: true,
+              wordWrap: 'on',
+              padding: { top: 16, bottom: 16 },
+              renderLineHighlight: 'all',
+              scrollbar: {
+                vertical: 'visible',
+                horizontal: 'visible',
+                verticalScrollbarSize: 8,
+                horizontalScrollbarSize: 8,
+              },
+              suggest: {
+                showMethods: true,
+                showFunctions: true,
+                showConstructors: true,
+                showFields: true,
+                showVariables: true,
+                showClasses: true,
+                showStructs: true,
+                showInterfaces: true,
+                showModules: true,
+                showProperties: true,
+              },
+              quickSuggestions: {
+                other: true,
+                comments: true,
+                strings: true,
+              },
+              parameterHints: {
+                enabled: true,
+              },
+              suggestOnTriggerCharacters: true,
+              acceptSuggestionOnEnter: 'on',
+              tabCompletion: 'on',
+              formatOnPaste: true,
+              formatOnType: true,
+            }}
+          />
         </Box>
 
-        {/* Editor and Preview Container */}
-        <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          {/* Editor Side */}
-          <Box
-            sx={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              borderRight: '1px solid rgba(0, 0, 0, 0.1)',
-              overflow: 'auto',
-            }}
-          >
-            <Box
-              sx={{
-                px: 2,
-                py: 1,
-                backgroundColor: 'rgba(0, 0, 0, 0.02)',
-                borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-              }}
-            >
-              <Typography variant="caption" sx={{ color: '#8e8e93', fontWeight: 600 }}>
-                EDITOR
-              </Typography>
-            </Box>
-            <Box
-              sx={{
-                flex: 1,
-                p: 3,
-                '& .tiptap-editor': {
-                  minHeight: '100%',
-                  outline: 'none',
-                  '& .ProseMirror': {
-                    minHeight: '100%',
-                    outline: 'none',
-                    fontSize: '0.95rem',
-                    lineHeight: 1.6,
-                    color: '#1d1d1f',
-                    '& > * + *': {
-                      marginTop: '0.75em',
-                    },
-                    '& h1': {
-                      fontSize: '2rem',
-                      fontWeight: 700,
-                      lineHeight: 1.2,
-                    },
-                    '& h2': {
-                      fontSize: '1.5rem',
-                      fontWeight: 600,
-                      lineHeight: 1.3,
-                    },
-                    '& h3': {
-                      fontSize: '1.25rem',
-                      fontWeight: 600,
-                      lineHeight: 1.4,
-                    },
-                    '& ul, & ol': {
-                      paddingLeft: '1.5rem',
-                    },
-                    '& code': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.05)',
-                      borderRadius: '0.25em',
-                      padding: '0.25em 0.5em',
-                      fontFamily: 'monospace',
-                      fontSize: '0.9em',
-                    },
-                    '& pre': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.05)',
-                      borderRadius: '0.5em',
-                      fontFamily: 'monospace',
-                      fontSize: '0.9em',
-                      padding: '0.75em 1em',
-                      '& code': {
-                        backgroundColor: 'transparent',
-                        padding: 0,
-                      },
-                    },
-                    '& blockquote': {
-                      borderLeft: '3px solid #007aff',
-                      paddingLeft: '1em',
-                      marginLeft: 0,
-                      fontStyle: 'italic',
-                      color: '#666',
-                    },
-                    '& .hljs-comment, & .hljs-quote': {
-                      color: '#6a737d',
-                    },
-                    '& .hljs-keyword, & .hljs-selector-tag': {
-                      color: '#d73a49',
-                    },
-                    '& .hljs-string, & .hljs-doctag': {
-                      color: '#032f62',
-                    },
-                    '& .hljs-title, & .hljs-section': {
-                      color: '#6f42c1',
-                    },
-                    '& .hljs-type, & .hljs-class': {
-                      color: '#22863a',
-                    },
-                    '& .hljs-literal, & .hljs-symbol, & .hljs-bullet': {
-                      color: '#005cc5',
-                    },
-                    '& .hljs-attribute, & .hljs-meta': {
-                      color: '#e36209',
-                    },
-                  },
-                },
-              }}
-            >
-              <EditorContent editor={editor} />
-            </Box>
-          </Box>
-
-          {/* Preview Side */}
+        {/* Preview Panel - Only for Markdown */}
+        {showPreview && (
           <Box
             sx={{
               flex: 1,
@@ -414,7 +232,7 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({ open, onClose, onSave }
               }}
             >
               <Typography variant="caption" sx={{ color: '#8e8e93', fontWeight: 600 }}>
-                PREVIEW (HTML RENDERED)
+                MARKDOWN PREVIEW
               </Typography>
             </Box>
             <Box
@@ -425,33 +243,49 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({ open, onClose, onSave }
                 '& h1': { fontSize: '2rem', fontWeight: 700, mt: 0, mb: 2, lineHeight: 1.2 },
                 '& h2': { fontSize: '1.5rem', fontWeight: 600, mt: 3, mb: 1.5, lineHeight: 1.3 },
                 '& h3': { fontSize: '1.25rem', fontWeight: 600, mt: 2, mb: 1, lineHeight: 1.4 },
+                '& h4': { fontSize: '1.125rem', fontWeight: 600, mt: 2, mb: 1, lineHeight: 1.4 },
+                '& h5': { fontSize: '1rem', fontWeight: 600, mt: 1.5, mb: 0.75, lineHeight: 1.4 },
                 '& p': { mb: 1.5, lineHeight: 1.6 },
                 '& ul, & ol': { pl: 3, mb: 1.5 },
-                '& li': { mb: 0.5 },
+                '& li': { mb: 0.5, lineHeight: 1.6 },
                 '& code': {
                   backgroundColor: 'rgba(0, 0, 0, 0.05)',
                   padding: '2px 6px',
                   borderRadius: '4px',
                   fontFamily: 'monospace',
                   fontSize: '0.9em',
+                  color: '#d73a49',
                 },
                 '& pre': {
                   backgroundColor: 'rgba(0, 0, 0, 0.05)',
-                  padding: '12px',
+                  padding: '16px',
                   borderRadius: '8px',
                   overflow: 'auto',
                   mb: 1.5,
                   '& code': {
                     backgroundColor: 'transparent',
                     padding: 0,
+                    color: '#1d1d1f',
+                    fontSize: '0.875rem',
+                    lineHeight: 1.5,
                   },
                 },
                 '& blockquote': {
-                  borderLeft: '3px solid #007aff',
+                  borderLeft: '4px solid #007aff',
                   paddingLeft: '1em',
                   marginLeft: 0,
+                  marginRight: 0,
                   fontStyle: 'italic',
                   color: '#666',
+                  backgroundColor: 'rgba(0, 122, 255, 0.05)',
+                  padding: '12px 16px',
+                  borderRadius: '4px',
+                  mb: 1.5,
+                },
+                '& hr': {
+                  border: 'none',
+                  borderTop: '2px solid rgba(0, 0, 0, 0.1)',
+                  my: 3,
                 },
                 '& a': {
                   color: '#007aff',
@@ -462,14 +296,48 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({ open, onClose, onSave }
                 },
                 '& strong': { fontWeight: 600 },
                 '& em': { fontStyle: 'italic' },
+                '& del': { textDecoration: 'line-through', opacity: 0.7 },
+                '& img': {
+                  maxWidth: '100%',
+                  height: 'auto',
+                  borderRadius: '8px',
+                  my: 2,
+                },
               }}
             >
-              {editor && (
-                <div dangerouslySetInnerHTML={{ __html: editor.getHTML() }} />
+              {content ? (
+                <ReactMarkdown
+                  components={{
+                    h1: ({children}) => <h1 style={{fontSize: '2rem', fontWeight: 700, marginTop: 0, marginBottom: '16px', lineHeight: 1.2}}>{children}</h1>,
+                    h2: ({children}) => <h2 style={{fontSize: '1.5rem', fontWeight: 600, marginTop: '24px', marginBottom: '12px', lineHeight: 1.3}}>{children}</h2>,
+                    h3: ({children}) => <h3 style={{fontSize: '1.25rem', fontWeight: 600, marginTop: '16px', marginBottom: '8px', lineHeight: 1.4}}>{children}</h3>,
+                    h4: ({children}) => <h4 style={{fontSize: '1.125rem', fontWeight: 600, marginTop: '16px', marginBottom: '8px', lineHeight: 1.4}}>{children}</h4>,
+                    h5: ({children}) => <h5 style={{fontSize: '1rem', fontWeight: 600, marginTop: '12px', marginBottom: '6px', lineHeight: 1.4}}>{children}</h5>,
+                    p: ({children}) => <p style={{marginBottom: '12px', lineHeight: 1.6}}>{children}</p>,
+                    ul: ({children}) => <ul style={{paddingLeft: '24px', marginBottom: '12px'}}>{children}</ul>,
+                    ol: ({children}) => <ol style={{paddingLeft: '24px', marginBottom: '12px'}}>{children}</ol>,
+                    li: ({children}) => <li style={{marginBottom: '4px', lineHeight: 1.6}}>{children}</li>,
+                    code: ({children}) => <code style={{backgroundColor: 'rgba(0, 0, 0, 0.05)', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.9em', color: '#d73a49'}}>{children}</code>,
+                    pre: ({children}) => <pre style={{backgroundColor: 'rgba(0, 0, 0, 0.05)', padding: '16px', borderRadius: '8px', overflow: 'auto', marginBottom: '12px'}}>{children}</pre>,
+                    blockquote: ({children}) => <blockquote style={{borderLeft: '4px solid #007aff', paddingLeft: '1em', marginLeft: 0, marginRight: 0, fontStyle: 'italic', color: '#666', backgroundColor: 'rgba(0, 122, 255, 0.05)', padding: '12px 16px', borderRadius: '4px', marginBottom: '12px'}}>{children}</blockquote>,
+                    hr: () => <hr style={{border: 'none', borderTop: '2px solid rgba(0, 0, 0, 0.1)', margin: '24px 0'}} />,
+                    a: ({href, children}) => <a href={href} target="_blank" rel="noopener noreferrer" style={{color: '#007aff', textDecoration: 'none'}}>{children}</a>,
+                    strong: ({children}) => <strong style={{fontWeight: 600}}>{children}</strong>,
+                    em: ({children}) => <em style={{fontStyle: 'italic'}}>{children}</em>,
+                    del: ({children}) => <del style={{textDecoration: 'line-through', opacity: 0.7}}>{children}</del>,
+                    img: ({src, alt}) => <img src={src} alt={alt} style={{maxWidth: '100%', height: 'auto', borderRadius: '8px', margin: '16px 0'}} />,
+                  }}
+                >
+                  {content}
+                </ReactMarkdown>
+              ) : (
+                <Typography sx={{ color: '#8e8e93', fontStyle: 'italic' }}>
+                  Preview will appear here as you type...
+                </Typography>
               )}
             </Box>
           </Box>
-        </Box>
+        )}
       </DialogContent>
 
       <DialogActions
@@ -479,6 +347,27 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({ open, onClose, onSave }
           gap: 1,
         }}
       >
+        <Box sx={{ mr: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="caption" sx={{ color: '#8e8e93' }}>
+            {content.length} characters
+          </Typography>
+          {content && (
+            <>
+              <Typography variant="caption" sx={{ color: '#8e8e93' }}>•</Typography>
+              <Typography variant="caption" sx={{ color: '#8e8e93' }}>
+                {content.split('\n').length} lines
+              </Typography>
+              {currentLanguage === 'markdown' && (
+                <>
+                  <Typography variant="caption" sx={{ color: '#8e8e93' }}>•</Typography>
+                  <Typography variant="caption" sx={{ color: '#8e8e93' }}>
+                    {content.split(/\s+/).filter(word => word.length > 0).length} words
+                  </Typography>
+                </>
+              )}
+            </>
+          )}
+        </Box>
         <Button
           onClick={handleClose}
           variant="outlined"
@@ -498,7 +387,7 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({ open, onClose, onSave }
           onClick={handleSave}
           variant="contained"
           color="primary"
-          disabled={!editor || editor.isEmpty}
+          disabled={!content.trim()}
           sx={{
             background: '#007aff',
             '&:hover': {

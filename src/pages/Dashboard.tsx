@@ -27,14 +27,14 @@ const Dashboard: React.FC = () => {
     setQuickNoteOpen(false);
   };
 
-  const handleSaveNote = (content: string, fileType: string) => {
+  const handleSaveNote = (content: string, language: string) => {
     const newNote = {
       id: `note-${Date.now()}`,
       title: `Note - ${new Date().toLocaleString()}`,
       content,
       createdAt: new Date(),
       updatedAt: new Date(),
-      tags: [fileType],
+      tags: [language],
     };
     addNote(newNote);
     console.log('Note saved:', newNote);

@@ -11,23 +11,27 @@
     "format": "prettier --write 'src/**/*.{ts,tsx,css,json}'",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["react", "typescript", "organization", "notes", "tasks"],
+  "keywords": [
+    "react",
+    "typescript",
+    "organization",
+    "notes",
+    "tasks"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "@emotion/react": "^11.13.5",
     "@emotion/styled": "^11.13.5",
+    "@monaco-editor/react": "^4.6.0",
     "@mui/icons-material": "^6.1.10",
     "@mui/material": "^6.1.10",
     "@mui/x-date-pickers": "^7.23.4",
-    "@tiptap/extension-code-block-lowlight": "^2.10.4",
-    "@tiptap/pm": "^2.10.4",
-    "@tiptap/react": "^2.10.4",
-    "@tiptap/starter-kit": "^2.10.4",
     "date-fns": "^2.30.0",
-    "lowlight": "^3.1.0",
+    "monaco-editor": "^0.52.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.1.1",
     "zustand": "^5.0.2"
   },
