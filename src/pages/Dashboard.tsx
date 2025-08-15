@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Button,
@@ -12,10 +12,32 @@ import {
   Upload as UploadIcon,
   Sync as SyncIcon,
 } from '@mui/icons-material';
+import QuickNoteModal from '../components/QuickNoteModal';
+import { useAppStore } from '../stores/useAppStore';
 
 const Dashboard: React.FC = () => {
+  const [quickNoteOpen, setQuickNoteOpen] = useState(false);
+  const addNote = useAppStore((state) => state.addNote);
+
   const handleQuickNote = () => {
-    console.log('Quick Note clicked');
+    setQuickNoteOpen(true);
+  };
+
+  const handleCloseQuickNote = () => {
+    setQuickNoteOpen(false);
+  };
+
+  const handleSaveNote = (content: string, fileType: string) => {
+    const newNote = {
+      id: `note-${Date.now()}`,
+      title: `Note - ${new Date().toLocaleString()}`,
+      content,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      tags: [fileType],
+    };
+    addNote(newNote);
+    console.log('Note saved:', newNote);
   };
 
   const handleAddTask = () => {
@@ -201,6 +223,13 @@ const example = "Coming soon...";`}
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Quick Note Modal */}
+      <QuickNoteModal
+        open={quickNoteOpen}
+        onClose={handleCloseQuickNote}
+        onSave={handleSaveNote}
+      />
     </Box>
   );
 };
