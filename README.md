@@ -2,6 +2,8 @@
 
 NoteIt is a modern React-based web application designed for technology leaders to stay organized. It provides a comprehensive platform for managing notes, tasks, and imported TextMate files with an elegant Mac-inspired UI.
 
+![](./noteit.png)
+
 ## 🚀 Quick Start
 
 ### Prerequisites
